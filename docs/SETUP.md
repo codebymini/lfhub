@@ -207,4 +207,6 @@ Pull the new image and restart the hub. It updates the database on start, by
 adding tables and columns, so the version before can run on it again if an upgrade
 has to be rolled back. A hub older than the phones' LoopFollow, or the other way
 around, shows on the LoopFollow Hub page, and the phone keeps alarming by itself
-until both understand each other.
+until both understand each other. The LoopFollow Hub page also shows the newest
+version of the hub's image (`latest` or `dev`), and LoopFollow on an admin phone
+reminds about a newer one every two weeks.

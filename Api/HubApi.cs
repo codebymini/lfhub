@@ -249,7 +249,7 @@ public static partial class HubApi
             var alarmCount = engine.AlarmExport(device)?.Alarms.Count;
             return Results.Ok(new
             {
-                hub = new { version = HubInfo.Version, api = HubInfo.Api, features = HubInfo.Features },
+                hub = new { version = HubInfo.Version, api = HubInfo.Api, features = HubInfo.Features, channel = HubInfo.Channel },
                 device = new
                 {
                     id = device.Id,

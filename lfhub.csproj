@@ -18,6 +18,8 @@
     <ContainerPort Include="8080" Type="tcp" />
     <!-- Links the image to the repository that built it (RepositoryUrl, set by the workflow). -->
     <ContainerLabel Include="org.opencontainers.image.source" Value="$(RepositoryUrl)" Condition="'$(RepositoryUrl)' != ''" />
+    <!-- The image tag the hub is published under (HubChannel, set by the workflow), reported in /v1/me. -->
+    <AssemblyMetadata Include="Channel" Value="$(HubChannel)" Condition="'$(HubChannel)' != ''" />
   </ItemGroup>
 
   <ItemGroup>
