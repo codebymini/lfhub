@@ -95,6 +95,7 @@ public class LoopStateTests
     private static readonly ClientSettings UtcMgdl = ClientSettings.FromJson(JsonNode.Parse("""{"units":"mg/dL"}""")!.AsObject());
     private static readonly ClientSettings La = ClientSettings.FromJson(JsonNode.Parse(
         """{"timeZone":"America/Los_Angeles","downloadPrediction":false,"predictionToLoad":3,"timeFormat":"h:mm a","downloadDays":2}""")!.AsObject());
+    private static readonly ClientSettings ShortForecast = ClientSettings.FromJson(JsonNode.Parse("""{"predictionToLoad":0.25}""")!.AsObject());
 
     private sealed class Patient : IDisposable
     {
@@ -211,7 +212,7 @@ public class LoopStateTests
         var l = p.State.BuildSnapshot(La, p.Now)!;
         Assert.Equal(40.0, N(l, "carbsToday"));
         Assert.Equal("Temporary sensor issue at 4:58 AM", l["cgmSensorState"]?.ToString());
-        Assert.Null(l["minBgMgdl"]);
+        Assert.Equal(30.0, N(l, "minBgMgdl"));
         Assert.Equal(U("2026-10-24T13:00:00Z"), N(l, "overrideEndAt"));
     }
 
@@ -223,11 +224,13 @@ public class LoopStateTests
         Assert.Equal(24, a.BgReadings.Count);
         Assert.Equal(101, a.BgReadings[^1].Sgv);
         Assert.DoesNotContain(a.BgReadings, g => g.Sgv > 600);
-        var expected = Pred.Take(13).Select((v, i) =>
-            $"{Math.Clamp((int)Math.Round(v, MidpointRounding.AwayFromZero), 39, 400)}@{U("2026-10-24T11:57:30Z") + 300 * i}");
-        Assert.Equal(string.Join(",", expected),
+        var expected = string.Join(",", Pred.Take(13).Select((v, i) =>
+            $"{(int)Math.Round(v, MidpointRounding.AwayFromZero)}@{U("2026-10-24T11:57:30Z") + 300 * i}"));
+        Assert.Equal(expected,
             string.Join(",", a.PredictionData.Select(x => $"{x.Sgv}@{(x.Date - DateTime.UnixEpoch).TotalSeconds}")));
-        Assert.Empty(p.State.BuildAlarmData(La, p.Now)!.PredictionData);
+        Assert.Equal(expected,
+            string.Join(",", p.State.BuildAlarmData(La, p.Now)!.PredictionData.Select(x => $"{x.Sgv}@{(x.Date - DateTime.UnixEpoch).TotalSeconds}")));
+        Assert.Equal(13, p.State.BuildAlarmData(ShortForecast, p.Now)!.PredictionData.Count);
     }
 
     [Fact]
