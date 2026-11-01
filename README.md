@@ -117,7 +117,12 @@ be made that way becomes `/v2`, served next to `/v1` for a transition period.
 
 Each side reports what it supports. The app sends `appVersion` and `features` with
 `PUT /v1/device/settings`; `GET /v1/me` answers with
-`hub: {version, api, features}`. A feature is used only once both sides have reported it:
+`hub: {version, api, features, channel}`, where `channel` is the image tag the hub was
+published under (`latest`, built from `main`, or `dev`, built from `dev`) and null for a
+build of its own. The app compares `version` with the `<Version>` in `lfhub.csproj` on the
+channel's branch (`dev` for a build of its own) to tell whether a newer hub is out (see
+Versions). A feature is used only once both
+sides have reported it:
 
 | Feature | Meaning |
 |---|---|
@@ -427,5 +432,22 @@ A push to `main` or `dev` runs the tests (with a Postgres service) and checks fo
 only then is the image built for linux-x64 and linux-arm64 with
 `dotnet publish /t:PublishContainer` and pushed to `ghcr.io/<owner>/<repository>`
 as `latest` from `main` and `dev` from `dev`, and as the commit's SHA.
+
+## Versions
+
+The version is `<Version>` in `lfhub.csproj`, `MAJOR.MINOR.PATCH`. Pull requests go to
+`dev` and leave the version alone.
+
+- A release on `main` is `X.Y.0`, tagged `vX.Y.0`, and right after it `dev` is at the
+  same version.
+- Every push to `dev` raises the last number in a commit of its own (`X.Y.1`, `X.Y.2`,
+  …), and the `dev` image is built from that commit.
+- A maintainer releases with `./release.sh`: it raises the version to `X.Y+1.0` (or
+  `X+1.0.0`) on a `release/v…` branch cut from `dev` and opens PRs to `main` and `dev`.
+  Merged with merge commits, `main` builds the `latest` image and is tagged, and `dev`
+  continues from the release.
+
+The bump on `dev` pushes with the repository secret `LFHUB_TOKEN_AUTOBUMP` when it is
+set, which a protected `dev` needs, and with the workflow's token otherwise.
 
 Setting up and running a hub: [docs/SETUP.md](docs/SETUP.md).
