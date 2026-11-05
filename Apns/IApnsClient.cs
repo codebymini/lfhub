@@ -28,8 +28,6 @@ public interface IApnsClient
     Task<PushResult> SendAlarmStopAsync(ApnsConfig cfg, Guid alarmId, string title, string subtitle, string? body,
         AlarmStopReason reason, CancellationToken ct);
 
-    Task<PushResult> SendHeartbeatAsync(ApnsConfig cfg, DateTime nowUtc, CancellationToken ct);
-
     Task<PushResult> SendLatestBgAsync(ApnsConfig cfg, string subtitle, CancellationToken ct);
 
     Task<PushResult> SendSpeakAsync(ApnsConfig cfg, string title, int current, int previous, string language,

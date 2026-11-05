@@ -402,7 +402,7 @@ public sealed partial class HubEngine : BackgroundService
             using var alarmCheck = new CancellationTokenSource(Timeout.InfiniteTimeSpan, _time);
             using var onStop = ct.Register(() => alarmCheck.CancelAfter(AlarmCheckShutdownGrace));
 
-            // Each device's badge, Live Activity, alarms, speech and heartbeat run on their own, so a
+            // Each device's badge, Live Activity, alarms and speech run on their own, so a
             // failure in one never holds back another.
             foreach (var device in devices)
             {
@@ -412,7 +412,6 @@ public sealed partial class HubEngine : BackgroundService
                 await GuardAsync("Alarm check", device.Id,
                     () => AlarmsAsync(device, rt.State, settings[device.Id], newData, alarmCheck.Token), alarmCheck.Token);
                 await GuardAsync("Speak", device.Id, () => SpeakAsync(device, rt.State, settings[device.Id], ct), ct);
-                await GuardAsync("Heartbeat", device.Id, () => HeartbeatAsync(device, ct), ct);
             }
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
@@ -482,7 +481,7 @@ public sealed partial class HubEngine : BackgroundService
     /// </summary>
     internal enum PushKind
     {
-        /// A badge, alarm stop, Latest BG, speech or heartbeat.
+        /// A badge, alarm stop, Latest BG or speech.
         Device,
         /// An alarm.
         Alarm,

@@ -93,7 +93,7 @@ A request body is at most 256 KB; a larger one is a 413.
   answer to it. Only badge pushes set them; every push counts in `lastPushOkAt`
   and `pushFailingSince`.
 - `lastPushOkAt`: when a push to the device's own push token (badge, alarm,
-  alarm stop, Latest BG, speech, heartbeat, test alarm) was last accepted by APNs. Pushes
+  alarm stop, Latest BG, speech, test alarm) was last accepted by APNs. Pushes
   to a Live Activity token are not counted: a rejected one means the activity ended.
 - `pushFailingSince`: when the pushes to the device began to be rejected; null
   while the last one was accepted. Pushes rejected for 10 minutes are logged as a
@@ -128,7 +128,7 @@ sides have reported it:
 |---|---|
 | `receipts` | The app posts a delivery receipt for every alarm push. Required: `alarms: true` is refused (409, "update LoopFollow") until the app reports it. |
 | `speak` | The app's notification service extension speaks Speak BG pushes; the hub sends them only to apps that report it. |
-| `heartbeat`, `bundle`, `latestBg` | Provided by the hub. |
+| `bundle`, `latestBg` | Provided by the hub. |
 | `devices` | Joining in a device's place or as its copy, the device list, and reading back the sources, alarms and client settings. |
 | `roles`, `invites` | Admin and member devices, and joining with an invite. |
 | `sourceRevision` | `patient.sourceRevision` in `/v1/me`. |
@@ -323,16 +323,6 @@ push that fails is not sent again. The newest reading each device has had is kep
 memory; a device seen for the first time since the hub started, or whose speech was
 off, starts from the current reading without speaking it, so a restarted hub repeats
 no reading.
-
-**Heartbeat**: each device with `alarms: true` and APNs registered gets a
-background push at its first check and then every 20 minutes:
-`{"aps":{"content-available":1},"lfhubHeartbeat":<Unix seconds>}`, with
-`apns-push-type: background`, `apns-priority: 10`, `apns-collapse-id: lfhub-heartbeat` and an expiration 20 minutes
-ahead. The app logs how long each one took to arrive; iOS may hold a background push
-back or drop it, so these delays decide whether the heartbeat can drive a dead-man
-alarm on the phone. The time of the last heartbeat is kept in memory, so a restarted
-hub sends one at its first check. A rejected heartbeat counts toward the device's
-push health like any other push.
 
 The alarm state (the engine's state and the alarm being delivered) is stored per
 device, written before a check sends its pushes. On shutdown, an alarm check that

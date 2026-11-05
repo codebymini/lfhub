@@ -202,34 +202,6 @@ public sealed class ApnsClient : IApnsClient, IDisposable
         return (payload, headers);
     }
 
-    /// <summary>
-    /// The heartbeat sent every 20 minutes to a device with alarms on: a background push
-    /// whose <c>lfhubHeartbeat</c> (Unix seconds) tells the app when it was sent. It goes at
-    /// priority 10; iOS may still hold a background push back or drop it.
-    /// </summary>
-    public Task<PushResult> SendHeartbeatAsync(ApnsConfig cfg, DateTime nowUtc, CancellationToken ct)
-    {
-        var (payload, headers) = Heartbeat(nowUtc);
-        return SendAsync(cfg, cfg.Token, cfg.BundleId, payload, "background", "10", ct, headers);
-    }
-
-    /// <summary>The heartbeat's payload and its collapse and expiration headers; it expires after 20 minutes.</summary>
-    internal static (JsonObject Payload, Dictionary<string, string> Headers) Heartbeat(DateTime nowUtc)
-    {
-        var unix = new DateTimeOffset(DateTime.SpecifyKind(nowUtc, DateTimeKind.Utc)).ToUnixTimeSeconds();
-        var payload = new JsonObject
-        {
-            ["aps"] = new JsonObject { ["content-available"] = 1 },
-            ["lfhubHeartbeat"] = unix,
-        };
-        var headers = new Dictionary<string, string>
-        {
-            ["apns-collapse-id"] = "lfhub-heartbeat",
-            ["apns-expiration"] = (unix + 20 * 60).ToString(System.Globalization.CultureInfo.InvariantCulture),
-        };
-        return (payload, headers);
-    }
-
     private static JsonObject Alert(string title, string subtitle, string? body)
     {
         var alert = new JsonObject { ["title"] = title, ["subtitle"] = subtitle };
