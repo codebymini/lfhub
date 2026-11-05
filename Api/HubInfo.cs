@@ -25,7 +25,7 @@ public static class HubInfo
             .FirstOrDefault(a => a.Key == "Channel")?.Value;
 
     /// <summary>Features this hub provides.</summary>
-    public static readonly string[] Features = ["receipts", "speak", "heartbeat", "bundle", "latestBg", "devices", "roles", "invites", "sourceRevision", "sharedApnsKey"];
+    public static readonly string[] Features = ["receipts", "speak", "bundle", "latestBg", "devices", "roles", "invites", "sourceRevision", "sharedApnsKey"];
 
     /// <summary>The app posts a delivery receipt for every alarm push (<c>POST /v1/receipt/{token}</c>).</summary>
     public const string Receipts = "receipts";
