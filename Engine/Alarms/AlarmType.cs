@@ -3,6 +3,10 @@ namespace LFHub.Engine.Alarms;
 /// <summary>
 /// LoopFollow's alarm types (Alarm/AlarmType/AlarmType.swift). Declaration
 /// order is priority order: a lower value is checked first.
+/// The app keeps its own list of the types each hub API version checks
+/// (HubClient.hubAlarmTypes) and checks the other types itself. A change to the types
+/// the hub checks needs a new <see cref="LFHub.Api.HubInfo.Api"/> version and that
+/// version's list in the app.
 /// </summary>
 public enum AlarmType
 {

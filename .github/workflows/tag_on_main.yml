@@ -1,0 +1,52 @@
+# Tags a release when main reaches a release version (X.Y.0): the version is
+# `<Version>` in lfhub.csproj and the tag is `v<version>`. Other versions, an
+# existing tag and forks are skipped. A manual run against main creates a missing tag.
+
+name: Tag release on main
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  tag:
+    if: ${{ !github.event.repository.fork }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Read the version
+        id: version
+        run: |
+          VERSION=$(sed -nE 's|^ *<Version>([^<]+)</Version>.*|\1|p' lfhub.csproj)
+          if [ -z "$VERSION" ]; then
+            echo "::error::No <Version> in lfhub.csproj"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.0$ ]]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "$VERSION is not a release version (X.Y.0); not tagging."
+          fi
+
+      - name: Create and push the tag
+        if: steps.version.outputs.release == 'true'
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "$TAG exists."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "$TAG"
+            git push origin "$TAG"
+          fi

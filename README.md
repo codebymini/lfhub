@@ -48,7 +48,7 @@ A request body is at most 256 KB; a larger one is a 413.
 | `GET /v1/me` | The device (settings, APNs state, last push, push health, alarm list state, active alarm, alarms the hub disabled, Live Activity state), the patient (name, Nightscout host, whether Dexcom is set, whether it is followed and has data) and the live stream status. Never returns keys, tokens or passwords. See below. |
 | `PUT /v1/device/apns` | `{token, environment: production\|sandbox, bundleId, teamId, keyId?, key?}`. `key` (the .p8) is kept when left out. Without `keyId`, or without `key` on first registration, the device pushes with the key of another device of the patient registered with a key of its own for the same team and bundle id, an admin device's first (`apnsKeyShared` in `/v1/me`), and follows a new key any such device sends; with no such device it is a 400. A device that sends its own key stops sharing. `token` must be hex, `bundleId` letters, digits, `.` and `-`, `teamId` and `keyId` ten upper-case letters or digits, and `key` a P-256 private key in PKCS #8 (Apple's .p8, with or without its PEM lines); anything else is a 400 and nothing is stored. Registering a push token removes any other device with the same token and bundle id, so a reinstalled app does not leave a second device alarming. |
 | `PUT /v1/device/settings` | Merge of `{badge: bool, liveActivity: bool, alarms: bool, criticalAlerts: bool, unit: mgdl\|mmol, appVersion: string, features: [string]}` (`appVersion` and each feature at most 32 characters, at most 32 features; see Compatibility); any other key, or a value of another type, is a 400. `alarms: true` is a 409 while the device has not reported every feature the hub requires (`receipts`). `alarms: true` is a 409 while the device has no alarm list that parses (upload it with `PUT /v1/device/alarms` first), or no client settings whose `timeZone` the hub knows (upload them with `PUT /v1/device/clientsettings` first), since day and night are the phone's. Answers the merged settings. |
-| `PUT /v1/device/clientsettings` | The LoopFollow settings that change what the hub builds, keyed as LoopFollow stores them (`units`, `predictionToLoad`, `downloadPrediction`, `downloadTreatments`, `downloadDays`, `showYesterdayLine` (the BG history then reaches one day further back, for the graph's yesterday overlay), `bgUpdateDelay`, `infoDisplayItems`, `persistentNotification`, and Speak BG's `speakBG`, `speakBGAlways`, `speakLowBG`, `speakProactiveLowBG`, `speakHighBG`, `speakFastDropDelta`, `speakLowBGLimit`, `speakHighBGLimit`, `speakLanguage`), plus the phone's `timeZone` (an IANA zone such as `Europe/Stockholm`), `decimalSeparator` and `timeFormat`. Missing or mistyped keys take LoopFollow's defaults; without a `timeZone` the hub knows, day and night and local times are taken in UTC, which the hub logs once per device that names a zone or has alarms on. |
+| `PUT /v1/device/clientsettings` | The LoopFollow settings that change what the hub builds, keyed as LoopFollow stores them (`units`, `predictionToLoad`, `downloadTreatments`, `downloadDays`, `showYesterdayLine` (the BG history then reaches one day further back, for the graph's yesterday overlay), `bgUpdateDelay`, `infoDisplayItems`, `persistentNotification`, and Speak BG's `speakBG`, `speakBGAlways`, `speakLowBG`, `speakProactiveLowBG`, `speakHighBG`, `speakFastDropDelta`, `speakLowBGLimit`, `speakHighBGLimit`, `speakLanguage`), plus the phone's `timeZone` (an IANA zone such as `Europe/Stockholm`), `decimalSeparator` and `timeFormat`. Missing or mistyped keys take LoopFollow's defaults; without a `timeZone` the hub knows, day and night and local times are taken in UTC, which the hub logs once per device that names a zone or has alarms on. |
 | `PUT /v1/device/alarms` | The app's alarm export (`AlarmSettingsExport` JSON) as is: alarms plus the global alarm configuration. Snoozes, Snooze All and Mute travel this way. An alarm of a type or option the hub does not know is skipped and logged; the others keep working. An export that does not parse at all, or that holds more than 200 alarms, is a 400. The hub parses each export once, when it first checks it. |
 | `POST /v1/receipt/{token}` | No body and no device key: the token is the credential. The phone's delivery receipt for an alarm push, `token` being the push's `lfhubReceipt`. 204 when the token is known, unused and less than 30 minutes old, which uses it up; 404 for any other token; 429 (with `Retry-After`) beyond 120 receipts a minute across the hub. See Alarms. |
 | `POST /v1/device/alarm/{alarmId}/handled` | The app snoozed or acknowledged the alarm, by any of its snooze paths. See Alarms. |
@@ -93,7 +93,7 @@ A request body is at most 256 KB; a larger one is a 413.
   answer to it. Only badge pushes set them; every push counts in `lastPushOkAt`
   and `pushFailingSince`.
 - `lastPushOkAt`: when a push to the device's own push token (badge, alarm,
-  alarm stop, Latest BG, speech, heartbeat, test alarm) was last accepted by APNs. Pushes
+  alarm stop, Latest BG, speech, test alarm) was last accepted by APNs. Pushes
   to a Live Activity token are not counted: a rejected one means the activity ended.
 - `pushFailingSince`: when the pushes to the device began to be rejected; null
   while the last one was accepted. Pushes rejected for 10 minutes are logged as a
@@ -117,13 +117,18 @@ be made that way becomes `/v2`, served next to `/v1` for a transition period.
 
 Each side reports what it supports. The app sends `appVersion` and `features` with
 `PUT /v1/device/settings`; `GET /v1/me` answers with
-`hub: {version, api, features}`. A feature is used only once both sides have reported it:
+`hub: {version, api, features, channel}`, where `channel` is the image tag the hub was
+published under (`latest`, built from `main`, or `dev`, built from `dev`) and null for a
+build of its own. The app compares `version` with the `<Version>` in `lfhub.csproj` on the
+channel's branch (`dev` for a build of its own) to tell whether a newer hub is out (see
+Versions). A feature is used only once both
+sides have reported it:
 
 | Feature | Meaning |
 |---|---|
 | `receipts` | The app posts a delivery receipt for every alarm push. Required: `alarms: true` is refused (409, "update LoopFollow") until the app reports it. |
 | `speak` | The app's notification service extension speaks Speak BG pushes; the hub sends them only to apps that report it. |
-| `heartbeat`, `bundle`, `latestBg` | Provided by the hub. |
+| `bundle`, `latestBg` | Provided by the hub. |
 | `devices` | Joining in a device's place or as its copy, the device list, and reading back the sources, alarms and client settings. |
 | `roles`, `invites` | Admin and member devices, and joining with an invite. |
 | `sourceRevision` | `patient.sourceRevision` in `/v1/me`. |
@@ -319,16 +324,6 @@ memory; a device seen for the first time since the hub started, or whose speech 
 off, starts from the current reading without speaking it, so a restarted hub repeats
 no reading.
 
-**Heartbeat**: each device with `alarms: true` and APNs registered gets a
-background push at its first check and then every 20 minutes:
-`{"aps":{"content-available":1},"lfhubHeartbeat":<Unix seconds>}`, with
-`apns-push-type: background`, `apns-priority: 10`, `apns-collapse-id: lfhub-heartbeat` and an expiration 20 minutes
-ahead. The app logs how long each one took to arrive; iOS may hold a background push
-back or drop it, so these delays decide whether the heartbeat can drive a dead-man
-alarm on the phone. The time of the last heartbeat is kept in memory, so a restarted
-hub sends one at its first check. A rejected heartbeat counts toward the device's
-push health like any other push.
-
 The alarm state (the engine's state and the alarm being delivered) is stored per
 device, written before a check sends its pushes. On shutdown, an alarm check that
 has begun runs to its end, for at most 10 seconds, so the outcome of its push is
@@ -427,5 +422,22 @@ A push to `main` or `dev` runs the tests (with a Postgres service) and checks fo
 only then is the image built for linux-x64 and linux-arm64 with
 `dotnet publish /t:PublishContainer` and pushed to `ghcr.io/<owner>/<repository>`
 as `latest` from `main` and `dev` from `dev`, and as the commit's SHA.
+
+## Versions
+
+The version is `<Version>` in `lfhub.csproj`, `MAJOR.MINOR.PATCH`. Pull requests go to
+`dev` and leave the version alone.
+
+- A release on `main` is `X.Y.0`, tagged `vX.Y.0`, and right after it `dev` is at the
+  same version.
+- Every push to `dev` raises the last number in a commit of its own (`X.Y.1`, `X.Y.2`,
+  …), and the `dev` image is built from that commit.
+- A maintainer releases with `./release.sh`: it raises the version to `X.Y+1.0` (or
+  `X+1.0.0`) on a `release/v…` branch cut from `dev` and opens PRs to `main` and `dev`.
+  Merged with merge commits, `main` builds the `latest` image and is tagged, and `dev`
+  continues from the release.
+
+The bump on `dev` pushes with the repository secret `LFHUB_TOKEN_AUTOBUMP` when it is
+set, which a protected `dev` needs, and with the workflow's token otherwise.
 
 Setting up and running a hub: [docs/SETUP.md](docs/SETUP.md).

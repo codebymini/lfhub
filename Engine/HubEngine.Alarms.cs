@@ -29,13 +29,6 @@ public sealed partial class HubEngine
     /// </summary>
     private static readonly TimeSpan SingleRing = TimeSpan.FromSeconds(30);
 
-    /// <summary>
-    /// How often a device with alarms on gets a heartbeat push. The app logs how late each
-    /// one arrives; the heartbeat drives no alarm.
-    /// </summary>
-    private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromMinutes(20);
-
-    private readonly ConcurrentDictionary<Guid, DateTime> _lastHeartbeat = new();
     private readonly ConcurrentDictionary<Guid, DateTime> _lastAlarmCheck = new();
     /// Devices with alarms on that cannot get them, logged once until that changes.
     private readonly ConcurrentDictionary<Guid, bool> _alarmsUnsentWarned = new();
@@ -243,26 +236,6 @@ public sealed partial class HubEngine
         _log.LogInformation("Alarm {Alarm} on {Device} stopped: alarms turned off", sounding.AlarmId, device.Id);
         if (sounding.Ring && device.Apns is not null)
             await StopRingingAsync(device, sounding, AlarmStopReason.Silenced, ct);
-    }
-
-    /// <summary>
-    /// Sends the device a heartbeat at its first check with alarms on and APNs registered,
-    /// then every 20 minutes while that holds. The time of the last one is kept in memory.
-    /// </summary>
-    private async Task HeartbeatAsync(Device device, CancellationToken ct)
-    {
-        if (!device.AlarmsEnabled || device.Apns is null)
-        {
-            _lastHeartbeat.TryRemove(device.Id, out _);
-            return;
-        }
-        var now = UtcNow;
-        if (_lastHeartbeat.TryGetValue(device.Id, out var last) && now - last < HeartbeatInterval) return;
-        _lastHeartbeat[device.Id] = now;
-        var result = await _apns.SendHeartbeatAsync(device.Apns, now, ct);
-        await TrackPushAsync(device.Id, result, PushKind.Device);
-        if (!result.Delivered)
-            _log.LogWarning("Heartbeat to {Device} failed: {Status}", device.Id, result.Status);
     }
 
     /// <summary>

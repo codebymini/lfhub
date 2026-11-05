@@ -652,7 +652,7 @@ public sealed class PatientState : IDisposable
             return new AlarmData
             {
                 BgReadings = bgReadings,
-                PredictionData = Forecast(settings, now),
+                PredictionData = Forecast(now),
                 ExpireDate = Utc(_profile?.ExpirationDate),
                 LastLoopTime = Utc(s.LastLoopTime),
                 LatestOverrideStart = Utc(overrides.LastOrDefault(o => o.Date <= now)?.Date),
@@ -678,24 +678,25 @@ public sealed class PatientState : IDisposable
         }
     }
 
-    /// AlarmTask.alarmPredictionData: Loop's stored forecast, or Trio's four collapsed to their lowest.
-    private List<GlucoseValue> Forecast(ClientSettings settings, double now)
+    /// AlarmTask.alarmPredictionData: Loop's forecast, or Trio's four collapsed to their lowest,
+    /// both independent of the graph settings.
+    private List<GlucoseValue> Forecast(double now)
     {
         var s = _status;
+        List<List<double>> forecasts;
+        double start;
         if (s.Device == "Loop")
         {
-            if (!settings.DownloadPrediction || s.LoopForecast is not { } f) return [];
-            // DeviceStatusLoop.swift: predictionToLoad × 12 points past the first, clamped to 39…400.
-            var toLoad = (int)(settings.PredictionToLoad * 12);
-            var points = new List<GlucoseValue>();
-            for (var i = 0; i <= toLoad && i < f.Values.Count && points.Count < AlarmForecastPointCap; i++)
-                points.Add(new GlucoseValue(Math.Clamp(Swift.RoundToInt(f.Values[i]), 39, 400), Swift.FromUnix(f.Start + 300.0 * i)));
-            return points;
+            if (s.LoopForecast is not { } f) return [];
+            forecasts = [f.Values];
+            start = f.Start;
         }
-
-        if (s.OpenApsPredBGs is not { } predBGs) return [];
-        var forecasts = DeviceStatusState.PredictionTypes.Where(predBGs.ContainsKey).Select(t => predBGs[t]).ToList();
-        var start = s.OpenApsPredUpdatedTime ?? now;
+        else
+        {
+            if (s.OpenApsPredBGs is not { } predBGs) return [];
+            forecasts = DeviceStatusState.PredictionTypes.Where(predBGs.ContainsKey).Select(t => predBGs[t]).ToList();
+            start = s.OpenApsPredUpdatedTime ?? now;
+        }
         var count = Math.Min(forecasts.Max(f => f.Count), AlarmForecastPointCap);
         var result = new List<GlucoseValue>();
         for (var i = 0; i < count; i++)

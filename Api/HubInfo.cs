@@ -16,8 +16,16 @@ public static class HubInfo
         (typeof(HubInfo).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0")
         .Split('+')[0];
 
+    /// <summary>
+    /// The image tag the hub was published under: <c>latest</c> (built from <c>main</c>) or
+    /// <c>dev</c> (built from <c>dev</c>); null for a build of its own.
+    /// </summary>
+    public static readonly string? Channel =
+        typeof(HubInfo).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
+            .FirstOrDefault(a => a.Key == "Channel")?.Value;
+
     /// <summary>Features this hub provides.</summary>
-    public static readonly string[] Features = ["receipts", "speak", "heartbeat", "bundle", "latestBg", "devices", "roles", "invites", "sourceRevision", "sharedApnsKey"];
+    public static readonly string[] Features = ["receipts", "speak", "bundle", "latestBg", "devices", "roles", "invites", "sourceRevision", "sharedApnsKey"];
 
     /// <summary>The app posts a delivery receipt for every alarm push (<c>POST /v1/receipt/{token}</c>).</summary>
     public const string Receipts = "receipts";

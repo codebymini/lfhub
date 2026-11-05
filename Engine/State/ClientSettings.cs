@@ -16,12 +16,9 @@ public sealed record ClientSettings
     /// "units": "mg/dL" or "mmol/L"; the snapshot's `unit`.
     public bool Mmol { get; init; }
 
-    /// "predictionToLoad", hours: the OpenAPS min/max window, the length of Loop's
-    /// stored forecast, the carbs horizon and the override graph's future edge.
+    /// "predictionToLoad", hours: the OpenAPS min/max window, the carbs horizon
+    /// and the override graph's future edge.
     public double PredictionToLoad { get; init; } = 1.0;
-
-    /// "downloadPrediction": Loop's forecast and min/max are stored only when on.
-    public bool DownloadPrediction { get; init; } = true;
 
     /// "downloadTreatments": off leaves every treatments-derived value unset.
     public bool DownloadTreatments { get; init; } = true;
@@ -118,7 +115,6 @@ public sealed record ClientSettings
         {
             Mmol = mmol,
             PredictionToLoad = Swift.Dbl(json["predictionToLoad"]) ?? d.PredictionToLoad,
-            DownloadPrediction = StrictBool(json, "downloadPrediction") ?? d.DownloadPrediction,
             DownloadTreatments = StrictBool(json, "downloadTreatments") ?? d.DownloadTreatments,
             DownloadDays = (int?)Swift.Int(json["downloadDays"]) is { } days and >= 1
                 ? Math.Min(days, MaxDownloadDays)

@@ -40,10 +40,10 @@ internal sealed partial class DeviceStatusState
     public double? IsfMgdl { get; private set; }
     public double? CarbRatio { get; private set; }
 
-    /// Loop's forecast as MainViewController.predictionData holds it with downloadPrediction on:
-    /// the raw values and the loop time the first point is placed at.
+    /// MainViewController.loopPredBGs and loopPredUpdatedTime: Loop's full forecast
+    /// and the loop time the first point is placed at.
     public (List<double> Values, double Start)? LoopForecast { get; private set; }
-    /// Storage.lastMinBgMgdl/lastMaxBgMgdl as Loop last set them (downloadPrediction on), with a write sequence.
+    /// Storage.lastMinBgMgdl/lastMaxBgMgdl as Loop last set them, with a write sequence.
     public (double Min, double Max, long Seq)? LoopMinMax { get; private set; }
     /// The predBGs OpenAPS last set lastMinBg/lastMaxBg from; the window depends on predictionToLoad.
     public (Dictionary<string, List<double>> PredBGs, long Seq)? OpenApsMinMax { get; private set; }
@@ -162,10 +162,8 @@ internal sealed partial class DeviceStatusState
         if (values is { Count: > 0 })
         {
             if (previousLoopTime < lastLoopTime || LoopForecast is null)
-            {
-                LoopForecast = (values, lastLoopTime);
                 LoopMinMax = (values.Min(), values.Max(), ++_seq);
-            }
+            LoopForecast = (values, lastLoopTime);
         }
         else
         {
@@ -244,7 +242,7 @@ internal sealed partial class DeviceStatusState
     /// The min/max the snapshot shows for a device with these prediction settings.
     public (double Min, double Max)? MinMax(ClientSettings settings)
     {
-        var loop = settings.DownloadPrediction ? LoopMinMax : null;
+        var loop = LoopMinMax;
         var openAps = OpenApsMinMax;
         if (loop is { } l && (openAps is null || l.Seq > openAps.Value.Seq)) return (l.Min, l.Max);
         if (openAps is not { } o) return null;

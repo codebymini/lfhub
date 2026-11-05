@@ -21,7 +21,6 @@ internal sealed class FakeApns : IApnsClient
 
     public List<string> LatestBg { get; } = [];
     public List<SpeakPush> Speeches { get; } = [];
-    public List<DateTime> Heartbeats { get; } = [];
     public List<LiveActivityPush> LiveActivities { get; } = [];
 
     public PushResult Result { get; set; } = new(true, "200", false, 200);
@@ -51,12 +50,6 @@ internal sealed class FakeApns : IApnsClient
         string? body, AlarmStopReason reason, CancellationToken ct)
     {
         Stops.Add(new StopPush(alarmId, title, subtitle, body, reason));
-        return Task.FromResult(Result);
-    }
-
-    public Task<PushResult> SendHeartbeatAsync(ApnsConfig cfg, DateTime nowUtc, CancellationToken ct)
-    {
-        Heartbeats.Add(nowUtc);
         return Task.FromResult(Result);
     }
 

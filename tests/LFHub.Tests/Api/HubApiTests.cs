@@ -623,6 +623,7 @@ public sealed class HubApiTests(PostgresFixture db) : IClassFixture<PostgresFixt
         Assert.Equal(1, me!["hub"]!["api"]!.GetValue<int>());
         Assert.Contains("receipts", me["hub"]!["features"]!.AsArray().Select(f => f!.GetValue<string>()));
         Assert.False(string.IsNullOrEmpty(me["hub"]!["version"]!.GetValue<string>()));
+        Assert.True(me["hub"]!.AsObject().ContainsKey("channel"));
         var device = me["device"]!;
         Assert.False(device["alarmsReceived"]!.GetValue<bool>());
         Assert.Equal(0, device["alarmCount"]!.GetValue<int>());

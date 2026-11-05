@@ -4,6 +4,14 @@ name: Build and Push lfhub Image
 # linux-arm64 and pushed to ghcr.io/<owner>/<repository>: main as `latest`, dev as
 # `dev`, each also under its commit's SHA. A manual run on another branch runs the
 # tests alone.
+#
+# Versions: `<Version>` in lfhub.csproj is MAJOR.MINOR.PATCH. A release on main is
+# X.Y.0 (set by release.sh); every push to dev raises PATCH by one in a commit of its
+# own ("CI: Bump dev version to X.Y.Z [skip ci]"), and the dev image is built from
+# that commit, so the version a hub reports matches lfhub.csproj on its branch. A push
+# that sets the version itself (a release sync) is built as it is. Forks build without
+# bumping. The bump pushes with the LFHUB_TOKEN_AUTOBUMP secret when it exists (needed
+# once dev is protected), otherwise with the workflow's token.
 
 on:
   push:
@@ -52,9 +60,59 @@ jobs:
           LFHUB_TEST_DATABASE: Host=localhost;Port=5432;Username=postgres
         run: dotnet test --solution lfhub.slnx -c Release --no-build
 
-  build-and-push:
+  bump-version:
     needs: test
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev' && !github.event.repository.fork
+    runs-on: ubuntu-latest
+    concurrency:
+      group: bump-${{ github.workflow }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.bump.outputs.sha }}
+
+    steps:
+      - name: Check out dev
+        uses: actions/checkout@v6
+        with:
+          ref: dev
+          fetch-depth: 0
+          token: ${{ secrets.LFHUB_TOKEN_AUTOBUMP || github.token }}
+
+      - name: Bump the patch version
+        id: bump
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] &&
+             git diff "$BEFORE..${GITHUB_SHA}" -- lfhub.csproj | grep -qE '^\+ *<Version>'; then
+            echo "The version was set in this push; building it as it is."
+            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CURRENT=$(sed -nE 's|^ *<Version>([0-9]+\.[0-9]+\.[0-9]+)</Version>.*|\1|p' lfhub.csproj)
+          if [ -z "$CURRENT" ]; then
+            echo "::error::No <Version>MAJOR.MINOR.PATCH</Version> in lfhub.csproj"
+            exit 1
+          fi
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          NEW="$MAJOR.$MINOR.$((PATCH + 1))"
+          sed -i -E "s|<Version>${CURRENT//./\\.}</Version>|<Version>$NEW</Version>|" lfhub.csproj
+          echo "Version: $CURRENT -> $NEW"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "CI: Bump dev version to $NEW [skip ci]" lfhub.csproj
+          git push origin HEAD:dev
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build-and-push:
+    needs: [test, bump-version]
+    if: >-
+      !cancelled() && needs.test.result == 'success' && needs.bump-version.result != 'failure' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
     runs-on: ubuntu-latest
     concurrency:
       group: build-${{ github.workflow }}
@@ -63,6 +121,8 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.bump-version.outputs.sha || github.sha }}
 
       - name: Set up .NET
         uses: actions/setup-dotnet@v5
@@ -86,4 +146,5 @@ jobs:
           -p:ContainerRegistry=ghcr.io
           -p:ContainerRepository=${REPOSITORY,,}
           -p:RepositoryUrl=${{ github.server_url }}/${{ github.repository }}
-          "-p:ContainerImageTags=\"${CHANNEL};${{ github.sha }}\""
+          -p:HubChannel=${CHANNEL}
+          "-p:ContainerImageTags=\"${CHANNEL};$(git rev-parse HEAD)\""
